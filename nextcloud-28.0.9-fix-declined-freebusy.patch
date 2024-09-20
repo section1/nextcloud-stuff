@@ -33,7 +33,16 @@ diff -urNp a/3rdparty/sabre/dav/lib/CalDAV/Schedule/Plugin.php b/3rdparty/sabre/
              $generator->setVAvailability(
 diff -urNp a/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php b/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php
 --- a/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php	2024-08-20 17:20:54.000000000 +0000
-+++ b/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php	2024-09-18 18:47:55.941005186 +0000
++++ b/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php	2024-09-20 16:42:12.041930107 +0000
+@@ -6,7 +6,7 @@ use DateTimeImmutable;
+ use DateTimeInterface;
+ use DateTimeZone;
+ use Sabre\VObject\Component\VCalendar;
+-use Sabre\VObject\Recur\EventIterator;
++use Sabre\VObject\Recur\FreeBusyEventIterator;
+ use Sabre\VObject\Recur\NoInstancesException;
+ 
+ /**
 @@ -79,6 +79,11 @@ class FreeBusyGenerator
      protected $vavailability;
  
@@ -96,19 +105,7 @@ diff -urNp a/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php b/3rdparty/sabre/v
      {
          foreach ($objects as $key => $object) {
              foreach ($object->getBaseComponents() as $component) {
-@@ -376,11 +390,19 @@ class FreeBusyGenerator
-                             }
-                         }
- 
-+                        if (isset($component->ATTENDEE)) {
-+                            foreach ($component->ATTENDEE as $attendee) {
-+                                if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
-+                                    break 2;
-+                                }
-+                            }
-+                        }
-+
-                         $times = [];
+@@ -380,7 +394,7 @@ class FreeBusyGenerator
  
                          if ($component->RRULE) {
                              try {
@@ -117,10 +114,25 @@ diff -urNp a/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php b/3rdparty/sabre/v
                              } catch (NoInstancesException $e) {
                                  // This event is recurring, but it doesn't have a single
                                  // instance. We are skipping this event from the output
+@@ -408,6 +422,14 @@ class FreeBusyGenerator
+                                 $iterator->next();
+                             }
+                         } else {
++                            if (isset($component->ATTENDEE)) {
++                                foreach ($component->ATTENDEE as $attendee) {
++                                    if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
++                                        break 2;
++                                    }
++                                }
++                            }
++
+                             $startTime = $component->DTSTART->getDateTime($this->timeZone);
+                             if ($this->end && $startTime > $this->end) {
+                                 break;
 diff -urNp a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php b/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php
 --- a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php	1970-01-01 00:00:00.000000000 +0000
-+++ b/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php	2024-09-18 19:34:28.775429590 +0000
-@@ -0,0 +1,513 @@
++++ b/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php	2024-09-20 16:49:32.169054841 +0000
+@@ -0,0 +1,525 @@
 +<?php
 +
 +namespace Sabre\VObject\Recur;
@@ -245,9 +257,21 @@ diff -urNp a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php b/3rdpar
 +            $events = $input->getByUID($uid);
 +        }
 +
++        $masterdeclined = null;
 +        foreach ($events as $vevent) {
 +            if (!isset($vevent->{'RECURRENCE-ID'})) {
 +                $this->masterEvent = $vevent;
++
++                if (isset($this->masterEvent->ATTENDEE)) {
++                    foreach ($this->masterEvent->ATTENDEE as $attendee) {
++                        if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
++                            $this->exceptions[
++                                $this->masterEvent->DTSTART->getDateTime($this->timeZone)->getTimeStamp()
++                            ] = true;
++                            $masterdeclined = 1;
++                        }
++                    }
++                }
 +            } else {
 +                $this->exceptions[
 +                    $vevent->{'RECURRENCE-ID'}->getDateTime($this->timeZone)->getTimeStamp()
@@ -311,7 +335,7 @@ diff -urNp a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php b/3rdpar
 +                $this->masterEvent->RDATE->getParts(),
 +                $this->startDate
 +            );
-+        } elseif (isset($this->masterEvent->RRULE)) {
++        } elseif (isset($this->masterEvent->RRULE) && !$masterdeclined) {
 +            $this->recurIterator = new RRuleIterator(
 +                $this->masterEvent->RRULE->getParts(),
 +                $this->startDate
