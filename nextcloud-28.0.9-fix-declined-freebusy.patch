@@ -120,7 +120,7 @@ diff -urNp a/3rdparty/sabre/vobject/lib/FreeBusyGenerator.php b/3rdparty/sabre/v
                          } else {
 +                            if (isset($component->ATTENDEE)) {
 +                                foreach ($component->ATTENDEE as $attendee) {
-+                                    if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
++                                    if (isset($attendee['PARTSTAT']) && str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
 +                                        break 2;
 +                                    }
 +                                }
@@ -264,7 +264,7 @@ diff -urNp a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php b/3rdpar
 +
 +                if (isset($this->masterEvent->ATTENDEE)) {
 +                    foreach ($this->masterEvent->ATTENDEE as $attendee) {
-+                        if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
++                        if (isset($attendee['PARTSTAT']) && str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
 +                            $this->exceptions[
 +                                $this->masterEvent->DTSTART->getDateTime($this->timeZone)->getTimeStamp()
 +                            ] = true;
@@ -280,7 +280,7 @@ diff -urNp a/3rdparty/sabre/vobject/lib/Recur/FreeBusyEventIterator.php b/3rdpar
 +                $founddeclined = null;
 +                if (isset($vevent->ATTENDEE)) {
 +                    foreach ($vevent->ATTENDEE as $attendee) {
-+                        if (str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
++                        if (isset($attendee['PARTSTAT']) && str_contains($attendee, $email) && 'DECLINED' === $attendee['PARTSTAT']->getValue()) {
 +                            $founddeclined = 1;
 +                        }
 +                    }
